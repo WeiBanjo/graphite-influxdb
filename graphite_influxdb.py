@@ -3,7 +3,7 @@ import time
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import datetime
-from influxdb import InfluxDBClient
+from influxdb import InfluxDBClusterClient
 try:
     import statsd
 except ImportError:
@@ -123,7 +123,7 @@ class InfluxdbReader(object):
             data = []
         time_info = start_time, end_time, self.step
         return time_info, [v[1] for v in data[self.path]]
-    
+
     def get_intervals(self):
         now = int(time.time())
         return IntervalSet([Interval(1, now)])
@@ -142,7 +142,9 @@ class InfluxdbFinder(object):
         # It turns what should be a load error into a runtime error
         config = normalize_config(config)
         self.config = config
-        self.client = InfluxDBClient(config['host'], config['port'], config['user'], config['passw'], config['db'], config['ssl'])
+        port = config['port']
+        hosts = [(host, port) for host in config['host'].split(',')]
+        self.client = InfluxDBClusterClient(hosts=hosts, username=config['user'], password=config['passw'], database=config['db'], ssl=config['ssl'])
         self.schemas = [(re.compile(patt), step) for (patt, step) in config['schema']]
         try:
             self.statsd_client = statsd.StatsClient(config['statsd'].get('host'),
